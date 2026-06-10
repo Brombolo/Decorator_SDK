@@ -96,7 +96,6 @@ TabShape ConfigReader::_ParseTabShape(const char* v) {
     if (!v) return TAB_SHAPE_FLAT;
     if (strcmp(v, "rounded") == 0) return TAB_SHAPE_ROUNDED;
     if (strcmp(v, "slanted") == 0) return TAB_SHAPE_SLANTED;
-    if (strcmp(v, "wave")    == 0) return TAB_SHAPE_WAVE;
     return TAB_SHAPE_FLAT;
 }
 

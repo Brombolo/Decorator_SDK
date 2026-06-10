@@ -14,9 +14,22 @@ Nessuna conoscenza di C++ richiesta per l'uso base.
 
 ---
 
-## Iniziare in 3 passi
+## Iniziare in 4 passi
 
-### 1. Copia il tema di partenza
+### 1. Copia gli header privati di Haiku (una tantum)
+
+Gli header `SATDecorator.h`, `Decorator.h` ecc. non fanno parte di
+`haiku_devel`. Li trovi già nel tuo repository `haiku_darkstyle`,
+nella cartella `FlatDecorator/includes/`.
+
+```sh
+cp -r /percorso/haiku_darkstyle/FlatDecorator/includes/* \
+      sdk/private-headers/
+```
+
+Serve farlo **una sola volta**. Vedi `sdk/private-headers/README.txt` per l'elenco esatto dei file necessari.
+
+### 2. Copia il tema di partenza
 
 ```sh
 cp themes/DarkFlat.conf theme.conf
@@ -30,7 +43,7 @@ Puoi scegliere tra i temi inclusi nella cartella `themes/`:
 | `ClassicBeOS.conf`| Tab giallo, stile R4/R5 originale        |
 | `ArcLight.conf`   | Chiaro, moderno, tab con effetto glass   |
 
-### 2. Modifica `theme.conf`
+### 3. Modifica `theme.conf`
 
 Apri `theme.conf` con qualsiasi editor di testo e cambia i valori che vuoi.  
 Le sezioni principali sono:
@@ -41,7 +54,7 @@ Le sezioni principali sono:
 - **`[title]`** — allineamento e ombra del testo del titolo
 - **`[resize_corner]`** — stile dell'angolo di ridimensionamento
 
-### 3. Genera e installa
+### 4. Genera e installa
 
 ```sh
 ./generate.sh
@@ -65,7 +78,7 @@ Poi apri **Preferenze → Aspetto**, scegli il tuo decorator dal menu e premi *A
 height        = 22        # Altezza in pixel (14–48)
 font_size     = 12        # Dimensione testo (8–18)
 font_bold     = false     # true = grassetto
-shape         = "flat"    # flat | rounded | slanted | wave
+shape         = "flat"    # flat | rounded | slanted
 corner_radius = 0         # Arrotondamento angoli (0–12, solo se shape=rounded)
 slant_angle   = 15        # Inclinazione laterale (5–45°, solo se shape=slanted)
 ```
@@ -77,7 +90,6 @@ slant_angle   = 15        # Inclinazione laterale (5–45°, solo se shape=slant
 | `flat`     | Rettangolo con angoli netti (default)        |
 | `rounded`  | Angoli arrotondati (usa `corner_radius`)     |
 | `slanted`  | Trapezio inclinato, stile BeOS R4            |
-| `wave`     | Profilo ondulato sui bordi laterali          |
 
 ---
 

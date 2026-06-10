@@ -1,212 +1,143 @@
 /*
  * Haiku Decorator SDK — TabPainter.cpp
- * Carica texture PNG e le applica al tab con blend mode software.
- *
- * Nota: Haiku app_server non espone alpha blending composited ai decorator.
- * Il blending viene calcolato pixel per pixel in CPU e scritto direttamente
- * nel DrawingEngine. Per texture di piccole dimensioni (tile ≤ 64x64) questo
- * è accettabile; per texture grandi usa opacity bassa.
+ * Carica PNG tramite BTranslationUtils e produce BBitmap blendato.
+ * Include solo header pubblici Haiku.
  */
 
 #include "TabPainter.h"
 
 #include <TranslationUtils.h>
-#include <BitmapStream.h>
-#include <File.h>
-#include <string.h>
 #include <algorithm>
 
 using std::min;
 using std::max;
 
-// Haiku internals
-#include "DrawingEngine.h"
-
-// ─── Costruttore / Distruttore ────────────────────────────────────────────────
-
-TabPainter::TabPainter(const TabTextureConfig& texConfig, const char* themeDir)
-    : fTextureBitmap(nullptr),
-      fScaledCache(nullptr),
-      fConfig(texConfig)
+TabPainter::TabPainter(const TabTextureConfig& config, const char* themeDir)
+    : fTexture(nullptr), fConfig(config)
 {
     if (fConfig.file.IsEmpty()) return;
-
-    // Costruisci percorso assoluto relativo alla cartella del tema
     BString path(themeDir);
     path << "/" << fConfig.file;
-
-    _LoadTexture(path.String());
+    _Load(path.String());
 }
 
 TabPainter::~TabPainter() {
-    delete fTextureBitmap;
-    delete fScaledCache;
+    delete fTexture;
 }
 
 bool TabPainter::IsValid() const {
-    return fTextureBitmap != nullptr;
+    return fTexture != nullptr && fTexture->IsValid();
 }
 
-// ─── Caricamento texture ──────────────────────────────────────────────────────
-
-bool TabPainter::_LoadTexture(const char* path) {
-    // Usa il Translation Kit di Haiku per caricare qualsiasi formato immagine
+bool TabPainter::_Load(const char* path) {
     BBitmap* bmp = BTranslationUtils::GetBitmapFile(path);
-    if (!bmp || !bmp->IsValid()) {
-        delete bmp;
-        return false;
+    if (!bmp || !bmp->IsValid()) { delete bmp; return false; }
+
+    // Converti in B_RGB32 se necessario
+    if (bmp->ColorSpace() == B_RGB32 || bmp->ColorSpace() == B_RGBA32) {
+        fTexture = bmp;
+        return true;
     }
 
-    // Converti sempre in B_RGBA32 per semplificare il blending
-    if (bmp->ColorSpace() != B_RGBA32) {
-        BRect bounds = bmp->Bounds();
-        BBitmap* conv = new (std::nothrow) BBitmap(bounds, B_RGBA32);
-        if (!conv || !conv->IsValid()) {
-            delete bmp;
-            delete conv;
-            return false;
-        }
-        // Copia con conversione di spazio colore
-        uint8* src = (uint8*)bmp->Bits();
-        uint8* dst = (uint8*)conv->Bits();
-        int32  w   = bounds.IntegerWidth() + 1;
-        int32  h   = bounds.IntegerHeight() + 1;
-        int32  src_bpr = bmp->BytesPerRow();
-        int32  dst_bpr = conv->BytesPerRow();
+    BRect b = bmp->Bounds();
+    BBitmap* conv = new (std::nothrow) BBitmap(b, B_RGB32);
+    if (!conv || !conv->IsValid()) { delete bmp; delete conv; return false; }
 
-        for (int32 y = 0; y < h; y++) {
-            uint8* sRow = src + y * src_bpr;
-            uint8* dRow = dst + y * dst_bpr;
-            for (int32 x = 0; x < w; x++) {
-                // Haiku BGRA → RGBA32 (che è sempre BGRA in Haiku)
-                dRow[0] = sRow[0];
-                dRow[1] = sRow[1];
-                dRow[2] = sRow[2];
-                dRow[3] = 255;
-                sRow += (bmp->ColorSpace() == B_RGB32 ? 4 : 3);
-                dRow += 4;
-            }
-        }
-        delete bmp;
-        fTextureBitmap = conv;
-    } else {
-        fTextureBitmap = bmp;
-    }
+    // Copia raw (BitmapStream non disponibile senza Translation Kit avanzato)
+    memcpy(conv->Bits(), bmp->Bits(),
+           min((size_t)conv->BitsLength(), (size_t)bmp->BitsLength()));
+    delete bmp;
+    fTexture = conv;
     return true;
 }
 
-// ─── Blend pixel ─────────────────────────────────────────────────────────────
-
-uint8 TabPainter::_ClampU8(int v) {
-    if (v < 0)   return 0;
+uint8 TabPainter::_Clamp(int v) {
+    if (v < 0) return 0;
     if (v > 255) return 255;
     return (uint8)v;
 }
 
-rgb_color TabPainter::_BlendPixel(rgb_color base,
-                                   rgb_color tex,
+rgb_color TabPainter::_BlendPixel(rgb_color base, rgb_color tex,
                                    float opacity) const
 {
-    rgb_color out = base;
-
     auto lerp8 = [](int a, int b, float t) -> uint8 {
         return (uint8)(a + (b - a) * t);
     };
 
     switch (fConfig.blend_mode) {
         case BLEND_MULTIPLY: {
-            // out = base * tex / 255
-            rgb_color mul = {
+            rgb_color m = {
                 (uint8)((base.red   * tex.red)   / 255),
                 (uint8)((base.green * tex.green) / 255),
-                (uint8)((base.blue  * tex.blue)  / 255),
-                255
-            };
-            out.red   = lerp8(base.red,   mul.red,   opacity);
-            out.green = lerp8(base.green, mul.green, opacity);
-            out.blue  = lerp8(base.blue,  mul.blue,  opacity);
-            break;
+                (uint8)((base.blue  * tex.blue)  / 255), 255 };
+            return { lerp8(base.red,   m.red,   opacity),
+                     lerp8(base.green, m.green, opacity),
+                     lerp8(base.blue,  m.blue,  opacity), 255 };
         }
         case BLEND_OVERLAY: {
-            auto overlay_ch = [](int b, int t) -> int {
-                if (b < 128)
-                    return (2 * b * t) / 255;
-                else
-                    return 255 - (2 * (255-b) * (255-t)) / 255;
+            auto ov = [](int b, int t) -> int {
+                return b < 128 ? (2*b*t)/255 : 255-(2*(255-b)*(255-t))/255;
             };
-            rgb_color ov = {
-                _ClampU8(overlay_ch(base.red,   tex.red)),
-                _ClampU8(overlay_ch(base.green, tex.green)),
-                _ClampU8(overlay_ch(base.blue,  tex.blue)),
-                255
-            };
-            out.red   = lerp8(base.red,   ov.red,   opacity);
-            out.green = lerp8(base.green, ov.green, opacity);
-            out.blue  = lerp8(base.blue,  ov.blue,  opacity);
-            break;
+            rgb_color o = { _Clamp(ov(base.red,   tex.red)),
+                            _Clamp(ov(base.green, tex.green)),
+                            _Clamp(ov(base.blue,  tex.blue)), 255 };
+            return { lerp8(base.red,   o.red,   opacity),
+                     lerp8(base.green, o.green, opacity),
+                     lerp8(base.blue,  o.blue,  opacity), 255 };
         }
         case BLEND_SCREEN: {
-            // out = 1 - (1-base)*(1-tex)
-            rgb_color sc = {
-                _ClampU8(255 - ((255-base.red)  *(255-tex.red)  /255)),
-                _ClampU8(255 - ((255-base.green)*(255-tex.green)/255)),
-                _ClampU8(255 - ((255-base.blue) *(255-tex.blue) /255)),
-                255
-            };
-            out.red   = lerp8(base.red,   sc.red,   opacity);
-            out.green = lerp8(base.green, sc.green, opacity);
-            out.blue  = lerp8(base.blue,  sc.blue,  opacity);
-            break;
+            rgb_color s = {
+                _Clamp(255-((255-base.red)  *(255-tex.red)  /255)),
+                _Clamp(255-((255-base.green)*(255-tex.green)/255)),
+                _Clamp(255-((255-base.blue) *(255-tex.blue) /255)), 255 };
+            return { lerp8(base.red,   s.red,   opacity),
+                     lerp8(base.green, s.green, opacity),
+                     lerp8(base.blue,  s.blue,  opacity), 255 };
         }
-        case BLEND_NORMAL:
-        default:
-            out.red   = lerp8(base.red,   tex.red,   opacity);
-            out.green = lerp8(base.green, tex.green, opacity);
-            out.blue  = lerp8(base.blue,  tex.blue,  opacity);
-            break;
+        default: // BLEND_NORMAL
+            return { lerp8(base.red,   tex.red,   opacity),
+                     lerp8(base.green, tex.green, opacity),
+                     lerp8(base.blue,  tex.blue,  opacity), 255 };
     }
-    return out;
 }
 
-// ─── Paint ────────────────────────────────────────────────────────────────────
-
-void TabPainter::Paint(DrawingEngine* engine,
-                        const BRect& rect,
-                        rgb_color base_color)
+BBitmap* TabPainter::CreateBlendedBitmap(const BRect& rect,
+                                          rgb_color base_color) const
 {
-    if (!IsValid()) return;
+    if (!IsValid()) return nullptr;
 
-    BRect texBounds = fTextureBitmap->Bounds();
-    int32 texW = texBounds.IntegerWidth() + 1;
+    BBitmap* result = new (std::nothrow) BBitmap(rect.OffsetToCopy(0,0),
+                                                  B_RGB32);
+    if (!result || !result->IsValid()) { delete result; return nullptr; }
+
+    BRect texBounds = fTexture->Bounds();
+    int32 texW = texBounds.IntegerWidth()  + 1;
     int32 texH = texBounds.IntegerHeight() + 1;
+    int32 outW  = rect.IntegerWidth()  + 1;
+    int32 outH  = rect.IntegerHeight() + 1;
 
-    int32 rLeft  = (int32)rect.left;
-    int32 rTop   = (int32)rect.top;
-    int32 rRight = (int32)rect.right;
-    int32 rBot   = (int32)rect.bottom;
+    uint8* texBits = (uint8*)fTexture->Bits();
+    uint8* outBits = (uint8*)result->Bits();
+    int32  texBPR  = fTexture->BytesPerRow();
+    int32  outBPR  = result->BytesPerRow();
 
-    uint8* texBits = (uint8*)fTextureBitmap->Bits();
-    int32  texBPR  = fTextureBitmap->BytesPerRow();
+    for (int32 y = 0; y < outH; y++) {
+        for (int32 x = 0; x < outW; x++) {
+            int32 tx = fConfig.tile ? (x % texW) : (x * (texW-1) / max(outW-1, 1));
+            int32 ty = fConfig.tile ? (y % texH) : (y * (texH-1) / max(outH-1, 1));
 
-    // Disegno pixel per pixel con tiling o stretch
-    for (int32 y = rTop; y <= rBot; y++) {
-        for (int32 x = rLeft; x <= rRight; x++) {
-            int32 tx, ty;
-            if (fConfig.tile) {
-                tx = (x - rLeft) % texW;
-                ty = (y - rTop)  % texH;
-            } else {
-                // Stretch: mappa [rect] → [texture]
-                tx = (int32)(((float)(x - rLeft) / (rRight - rLeft)) * (texW - 1));
-                ty = (int32)(((float)(y - rTop)  / (rBot   - rTop))  * (texH - 1));
-            }
-
-            // Leggi pixel texture (formato BGRA in Haiku B_RGBA32)
             uint8* tp = texBits + ty * texBPR + tx * 4;
-            rgb_color tex_pixel = { tp[2], tp[1], tp[0], tp[3] };
+            // Haiku B_RGB32 = BGRA
+            rgb_color tex_px = { tp[2], tp[1], tp[0], 255 };
+            rgb_color blended = _BlendPixel(base_color, tex_px, fConfig.opacity);
 
-            rgb_color blended = _BlendPixel(base_color, tex_pixel, fConfig.opacity);
-            engine->StrokePoint(BPoint((float)x, (float)y), blended);
+            uint8* op = outBits + y * outBPR + x * 4;
+            op[0] = blended.blue;
+            op[1] = blended.green;
+            op[2] = blended.red;
+            op[3] = 255;
         }
     }
+
+    return result;
 }

@@ -3,45 +3,38 @@
 
 /*
  * Haiku Decorator SDK — TabPainter.h
- * Gestisce il caricamento di texture PNG e la loro applicazione
- * sul tab con blend mode configurabile.
- * Usato da ThemeRenderer quando effect.type = "texture".
+ *
+ * Carica una texture PNG e calcola il colore blendato per ogni pixel.
+ * NON usa DrawingEngine direttamente: ritorna i pixel in un BBitmap
+ * che SDKDecorator disegna con DrawBitmap() tramite l'API pubblica.
  */
 
 #include "ThemeConfig.h"
-#include <Rect.h>
 #include <Bitmap.h>
-
-class DrawingEngine;
+#include <Rect.h>
 
 class TabPainter {
 public:
-    explicit        TabPainter(const TabTextureConfig& texConfig,
+    explicit        TabPainter(const TabTextureConfig& config,
                                 const char* themeDir);
                    ~TabPainter();
 
-    // Ritorna true se la texture è stata caricata con successo
     bool            IsValid() const;
 
-    // Disegna la texture su rect applicando blend_mode e opacity
-    // base_color = colore di sfondo sul quale blend (da TabColorSet)
-    void            Paint(DrawingEngine* engine,
-                          const BRect& rect,
-                          rgb_color base_color);
+    // Ritorna un BBitmap (B_RGB32) con la texture blendato su base_color.
+    // Le dimensioni corrispondono a rect.
+    // Il caller è responsabile del delete.
+    BBitmap*        CreateBlendedBitmap(const BRect& rect,
+                                         rgb_color base_color) const;
 
 private:
-    BBitmap*        fTextureBitmap;     // texture originale caricata
-    BBitmap*        fScaledCache;       // cache del tile pre-scalato
-    TabTextureConfig fConfig;
+    BBitmap*            fTexture;
+    TabTextureConfig    fConfig;
 
-    bool            _LoadTexture(const char* path);
-
-    // Applica il blend mode pixel per pixel
-    rgb_color       _BlendPixel(rgb_color base,
-                                 rgb_color tex,
-                                 float opacity) const;
-
-    static uint8    _ClampU8(int v);
+    bool                _Load(const char* path);
+    rgb_color           _BlendPixel(rgb_color base, rgb_color tex,
+                                     float opacity) const;
+    static uint8        _Clamp(int v);
 };
 
 #endif // TAB_PAINTER_H

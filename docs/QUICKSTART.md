@@ -7,13 +7,24 @@ senza scrivere una sola riga di codice.
 
 ## Passo 1 — Prepara l'ambiente (una tantum)
 
-Apri il **Terminale** di Haiku e digita:
+**Installa haiku_devel:**
 
 ```sh
 pkgman install haiku_devel
 ```
 
-Premi Invio e attendi che finisca. Lo farai solo la prima volta.
+**Copia gli header privati:**
+
+Gli header `SATDecorator.h` e gli altri non fanno parte di `haiku_devel`.
+Li trovi già nel tuo repository `haiku_darkstyle`, nella cartella
+`FlatDecorator/includes/`. Copia quella cartella qui:
+
+```sh
+cp -r /percorso/haiku_darkstyle/FlatDecorator/includes/* \
+      sdk/private-headers/
+```
+
+Serve farlo solo la prima volta.
 
 ---
 

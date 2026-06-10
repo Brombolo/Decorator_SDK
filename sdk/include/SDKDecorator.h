@@ -3,15 +3,22 @@
 
 /*
  * Haiku Decorator SDK — SDKDecorator.h
- * Classe principale del decorator, estende SATDecorator.
- * Il codice utente non deve modificare questo file;
- * tutte le personalizzazioni passano da theme.conf.
+ *
+ * Usa solo header pubblici di Haiku:
+ *   <Decorator.h>  <SATDecorator.h>  <View.h>  <GraphicsDefs.h>
+ *
+ * Non include DrawingEngine.h, ServerBitmap.h o altri header privati
+ * di app_server — quelli sono wrappati internamente da Decorator.
  */
 
 #include "ThemeConfig.h"
 #include "ThemeRenderer.h"
 
-#include <SATDecorator.h>   // Haiku internal
+#include <SATDecorator.h>   // /boot/system/develop/headers/private/servers/app/decorator/
+#include <DecorManager.h>   // contiene sia DecorAddOn che DecorManager
+#include <Rect.h>
+#include <Region.h>
+#include <View.h>
 
 class SDKDecorAddOn : public DecorAddOn {
 public:
@@ -29,10 +36,7 @@ public:
                                      BRect rect,
                                      Desktop* desktop,
                                      const ThemeConfig& config);
-
     virtual             ~SDKDecorator();
-
-    // ─── Override obbligatori ─────────────────────────────────────────────────
 
     virtual void        GetComponentColors(Component component,
                                             uint8 highlight,
@@ -40,9 +44,12 @@ public:
                                             Decorator::Tab* tab) override;
 
 protected:
+    // Disegno frame e tab
     virtual void        _DrawFrame(BRect invalid) override;
     virtual void        _DrawTab(Decorator::Tab* tab, BRect invalid) override;
     virtual void        _DrawTitle(Decorator::Tab* tab, BRect r) override;
+
+    // Disegno pulsanti
     virtual void        _DrawClose(Decorator::Tab* tab, bool direct,
                                    BRect rect) override;
     virtual void        _DrawZoom(Decorator::Tab* tab, bool direct,
@@ -58,17 +65,30 @@ protected:
 private:
     ThemeConfig         fConfig;
     ThemeRenderer       fRenderer;
+    TabPainter*         fTabPainter;    // non-null solo se effect.type=texture
 
-    void                _DrawButtonBitmap(ServerBitmap* bitmap,
-                                          bool direct, BRect rect);
+    // ─── Disegno tramite DrawingEngine (puntatore già in Decorator) ───────────
 
-    ServerBitmap*       _GetButtonBitmap(Decorator::Tab* tab,
-                                          Component item,
-                                          bool pressed,
-                                          int32 width, int32 height);
+    // Disegna il tab usando le specifiche calcolate da ThemeRenderer
+    void                _PaintTab(Decorator::Tab* tab, const BRect& tabRect,
+                                   bool focused, bool stackTile);
+
+    // Disegna un pulsante (Close o Zoom) direttamente senza bitmap cache
+    void                _PaintButton(const BRect& rect,
+                                      const ButtonDrawSpec& spec);
+
+    // Disegna l'icona del pulsante (X, □, dot, ecc.)
+    void                _PaintButtonIcon(const BRect& rect,
+                                          const ButtonDrawSpec& spec);
+
+    // Disegna i bordi del frame con lo stile configurato
+    void                _PaintBorderEdge(const BRect& rect,
+                                          bool focused, bool horizontal,
+                                          bool isTopOrLeft);
+
+    // Disegna l'angolo di resize
+    void                _PaintResizeCorner(const BRect& rect, bool focused);
 };
-
-// ─── Entry point richiesto da Haiku ──────────────────────────────────────────
 
 extern "C" DecorAddOn* instantiate_decor_addon(image_id id, const char* name);
 

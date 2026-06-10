@@ -16,7 +16,7 @@ RULES = {
     "tab.font_size":            ("int",   8,    18),
     "tab.corner_radius":        ("int",   0,    12),
     "tab.slant_angle":          ("float", 5.0,  45.0),
-    "tab.shape":                ("enum",  ["flat", "rounded", "slanted", "wave"]),
+    "tab.shape":                ("enum",  ["flat", "rounded", "slanted"]),
     "tab.effect.type":          ("enum",  ["none", "gradient", "glass", "texture", "tint_from_system"]),
     "tab.effect.gradient_dir":  ("enum",  ["vertical", "horizontal", "diagonal"]),
     "tab.effect.glass_opacity": ("float", 0.0, 1.0),

@@ -3,92 +3,102 @@
 
 /*
  * Haiku Decorator SDK — ThemeRenderer.h
- * Traduce ThemeConfig in chiamate concrete a DrawingEngine.
- * Usato internamente da SDKDecorator.
+ *
+ * ThemeRenderer NON include header interni di app_server.
+ * Calcola solo dati (colori, rect, strutture) che SDKDecorator
+ * usa tramite le API pubbliche di Decorator / DrawingEngine
+ * già esposte da <Decorator.h>.
  */
 
 #include "ThemeConfig.h"
 #include <Rect.h>
-#include <View.h>
+#include <GraphicsDefs.h>   // rgb_color, BGradientLinear
+#include <GradientLinear.h>
 
-// Forward declarations Haiku internals
-class DrawingEngine;
-class ServerBitmap;
-namespace BitmapDrawingEngine_ { class BitmapDrawingEngine; }
+// ─── Strutture dati di output (nessuna dipendenza da app_server) ──────────────
+
+// Risultato del calcolo di un gradiente
+struct GradientSpec {
+    bool            active;         // false = usa fill_color piatto
+    rgb_color       color_start;
+    rgb_color       color_end;
+    float           start_x, start_y;
+    float           end_x,   end_y;
+};
+
+// Tutto quello che serve per disegnare il tab in un singolo passaggio
+struct TabDrawSpec {
+    // Fill
+    rgb_color       fill_color;
+    GradientSpec    gradient;
+
+    // Bordi esterni (3 lati: top, left, right — bottom è aperto)
+    rgb_color       border_outer;
+    rgb_color       border_outer_shadow;
+
+    // Bevel interno
+    rgb_color       bevel_light;
+    rgb_color       bevel_shadow;
+
+    // Glass overlay (se effect=glass)
+    bool            glass_enabled;
+    rgb_color       glass_color;
+    BRect           glass_rect;
+
+    // Separatore
+    bool            separator_enabled;
+    rgb_color       separator_color;
+
+    // Stack & Tile indicator
+    bool            stack_indicator;
+    rgb_color       indicator_color;
+    BRect           indicator_rect;
+
+    // Inner glow (bordo superiore)
+    bool            inner_glow_enabled;
+    rgb_color       inner_glow_color;
+};
+
+// Tutto quello che serve per disegnare un pulsante
+struct ButtonDrawSpec {
+    rgb_color       bg_color;
+    rgb_color       highlight;
+    rgb_color       shadow;
+    rgb_color       icon_color;
+    ButtonShape     shape;
+    ButtonIconStyle icon_style;
+    float           icon_scale;
+    float           stroke_width;
+    bool            is_close;
+    bool            pressed;
+};
+
+// ─── ThemeRenderer ────────────────────────────────────────────────────────────
 
 class ThemeRenderer {
 public:
     explicit        ThemeRenderer(const ThemeConfig& config);
 
-    // ─── Tab ──────────────────────────────────────────────────────────────────
+    // Calcola la specifica di disegno per il tab
+    TabDrawSpec     CalcTab(const BRect& tabRect,
+                             bool focused,
+                             bool stackTile) const;
 
-    // Disegna l'intero tab (sfondo + bordi + effetto)
-    void            DrawTab(DrawingEngine* engine,
-                            const BRect& tabRect,
-                            bool focused,
-                            bool stackTile);
+    // Calcola i 6 colori del bordo (formato Haiku GetComponentColors)
+    void            CalcBorderColors(rgb_color colors[6], bool focused) const;
 
-    // Disegna solo il riempimento del tab (sfondo + eventuale gradiente/texture)
-    void            DrawTabFill(DrawingEngine* engine,
-                                const BRect& tabRect,
-                                bool focused);
+    // Calcola la specifica di disegno per un pulsante
+    ButtonDrawSpec  CalcButton(bool isClose, bool pressed, bool focused) const;
 
-    // ─── Bordi ────────────────────────────────────────────────────────────────
-
-    // Ritorna l'array di 6 colori per GetComponentColors() del decorator
-    void            GetBorderColors(rgb_color colors[6], bool focused) const;
-
-    // Disegna un bordo con lo stile configurato
-    void            DrawBorder(DrawingEngine* engine,
-                               const BRect& outerRect,
-                               bool focused);
-
-    // ─── Pulsanti ─────────────────────────────────────────────────────────────
-
-    // Crea e ritorna il bitmap pre-renderizzato per un pulsante
-    // (compatibile con il meccanismo _GetBitmapForButton del Decorator base)
-    ServerBitmap*   CreateButtonBitmap(bool isClose,
-                                       bool pressed,
-                                       bool focused,
-                                       int32 width,
-                                       int32 height);
-
-    // ─── Resize corner ────────────────────────────────────────────────────────
-    void            DrawResizeCorner(DrawingEngine* engine,
-                                     const BRect& rect,
-                                     bool focused);
+    // Utilità colore (pubbliche per uso in SDKDecorator)
+    static rgb_color Lighten(rgb_color c, float amount);
+    static rgb_color Darken(rgb_color c, float amount);
+    static rgb_color Lerp(rgb_color a, rgb_color b, float t);
 
 private:
     const ThemeConfig&  fConfig;
 
-    // Calcola i colori effettivi per uno stato del tab
-    TabColorSet         _ResolveTabColors(bool focused, bool stackTile) const;
-
-    // Applica l'effetto selezionato (gradiente, glass, ecc.) su tabRect
-    void                _ApplyEffect(DrawingEngine* engine,
-                                     const BRect& fillRect,
-                                     const TabColorSet& colors,
-                                     bool focused);
-
-    // Disegna la forma del tab con il clip corretto (flat/rounded/slanted)
-    void                _DrawTabShape(DrawingEngine* engine,
-                                      const BRect& tabRect,
-                                      rgb_color fillColor,
-                                      bool focused);
-
-    // Disegna l'icona dentro un pulsante
-    void                _DrawButtonIcon(DrawingEngine* engine,
-                                        const BRect& rect,
-                                        bool isClose,
-                                        bool pressed,
-                                        rgb_color iconColor);
-
-    // Schiarisce o scurisce un colore di una percentuale
-    static rgb_color    _Lighten(rgb_color c, float amount);
-    static rgb_color    _Darken(rgb_color c, float amount);
-
-    // Interpola tra due colori (t=0 → a, t=1 → b)
-    static rgb_color    _Lerp(rgb_color a, rgb_color b, float t);
+    TabColorSet     _ResolveTabColors(bool focused, bool stackTile) const;
 };
 
 #endif // THEME_RENDERER_H

@@ -137,7 +137,6 @@ Gestisce il clip geometrico in base a `tab.shape`:
 | `flat`     | `FillRect` semplice                                  |
 | `rounded`  | `FillRect` + `FillEllipse` agli angoli               |
 | `slanted`  | `FillRect` (il clip trapezoidale è responsabilità del caller — vedere nota) |
-| `wave`     | Alias di `flat` nella v1 (implementazione futura)    |
 
 > **Nota `slanted`:** la geometria del clip trapezoidale richiede di sovrascrivere
 > `GetTabRect()` in `SDKDecorator` per restituire una `BRect` con offset laterale.
@@ -389,7 +388,6 @@ esponga questo campo.
 | Funzionalità                        | Complessità | Note                                     |
 |-------------------------------------|-------------|------------------------------------------|
 | Shape `slanted` con clip trapezoidale| Media      | Override di `GetTabRect()` necessario    |
-| Shape `wave`                        | Alta        | Richiede path drawing con curve di Bezier|
 | Animated focus transition           | Alta        | Richiede timer e invalidation esplicita  |
 | Hot-reload di theme.conf            | Bassa       | Aggiungere inotify/node monitor su conf  |
 | GUI configurator (app Haiku nativa) | Alta        | App separata che scrive theme.conf       |

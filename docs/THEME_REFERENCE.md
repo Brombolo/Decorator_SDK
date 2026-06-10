@@ -34,7 +34,7 @@ Tutte le chiavi disponibili con tipo, valori ammessi e default.
 | `height`        | `int`   | `22`     | 14–48                                    |
 | `font_size`     | `int`   | `12`     | 8–18                                     |
 | `font_bold`     | `bool`  | `false`  |                                          |
-| `shape`         | `enum`  | `"flat"` | `flat` `rounded` `slanted` `wave`        |
+| `shape`         | `enum`  | `"flat"` | `flat` `rounded` `slanted`        |
 | `corner_radius` | `int`   | `0`      | 0–12 (solo se `shape=rounded`)           |
 | `slant_angle`   | `float` | `15`     | 5.0–45.0° (solo se `shape=slanted`)      |
 

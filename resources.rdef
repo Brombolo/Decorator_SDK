@@ -1,0 +1,22 @@
+/*
+ * Haiku Decorator SDK — resources.rdef
+ *
+ * File di risorse richiesto dal makefile-engine di Haiku.
+ * Definisce il tipo MIME del decorator come add-on di sistema.
+ *
+ * Il nome viene sovrascritto dal Makefile tramite la variabile NAME.
+ */
+
+resource app_signature "application/x-vnd.Haiku-decorator";
+
+resource app_flags B_BACKGROUND_APP;
+
+resource app_version {
+    major  = 1,
+    middle = 0,
+    minor  = 0,
+    variety = B_APPV_FINAL,
+    internal = 0,
+    short_info = "Haiku Decorator SDK",
+    long_info  = "Created with Haiku Decorator SDK"
+};

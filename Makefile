@@ -1,91 +1,92 @@
 ## ════════════════════════════════════════════════════════════════════════════
 ##  Haiku Decorator SDK — Makefile
-##  Uso: make  (oppure  make NAME=MyTheme  per sovrascrivere il nome)
+##  Usa il makefile-engine nativo di Haiku (stesso approccio di DecoratorSDK
+##  by CodeforEvolution: github.com/CodeforEvolution/DecoratorSDK)
 ## ════════════════════════════════════════════════════════════════════════════
 
-## ─── Configurazione ───────────────────────────────────────────────────────────
-## Il nome viene letto da theme.conf; può essere sovrascritto da riga di comando.
-NAME       ?= $(shell grep '^name' theme.conf | head -1 | sed 's/.*=\s*"\(.*\)".*/\1/')
+## ─── Nome (letto da theme.conf, sovrascrivibile da riga di comando) ───────────
+NAME ?= $(shell grep '^name' theme.conf | head -1 | sed 's/.*=[ \t]*"\(.*\)".*/\1/')
 ifeq ($(NAME),)
-NAME       = MyDecorator
+NAME = MyDecorator
 endif
 
-CONF_PATH   = $(shell pwd)/theme.conf
+TYPE = SHARED
 
-## ─── Percorsi ────────────────────────────────────────────────────────────────
-SDK_SRC     = sdk/src
-SDK_INC     = sdk/include
-OUTPUT_DIR  = output
-INSTALL_DIR = /boot/home/config/non-packaged/add-ons/decorators
+APP_MIME_SIG =
 
-## ─── Sorgenti ────────────────────────────────────────────────────────────────
 SRCS = \
-    $(SDK_SRC)/ConfigReader.cpp \
-    $(SDK_SRC)/ThemeRenderer.cpp \
-    $(SDK_SRC)/SDKDecorator.cpp
+    sdk/src/ConfigReader.cpp \
+    sdk/src/ThemeRenderer.cpp \
+    sdk/src/TabPainter.cpp \
+    sdk/src/SDKDecorator.cpp
 
-OBJS = $(SRCS:.cpp=.o)
+RDEFS = resources.rdef
 
-## ─── Compiler flags ──────────────────────────────────────────────────────────
-HAIKU_INCS  = \
-    /boot/system/develop/headers/private/app \
-    /boot/system/develop/headers/private/interface \
-    /boot/system/develop/headers/private/servers/app \
-    /boot/system/develop/headers/os \
-    /boot/system/develop/headers/os/interface \
-    /boot/system/develop/headers/os/support
+RSRCS =
 
-INCLUDE_FLAGS = $(addprefix -I, $(HAIKU_INCS)) -I$(SDK_INC)
+LIBS = $(STDCPPLIBS) be translation
 
-CXXFLAGS = -O2 -std=c++11 \
-    -DTHEME_CONF_PATH='"$(CONF_PATH)"' \
-    $(INCLUDE_FLAGS)
+LIBPATHS =
 
-LDFLAGS  = -shared -Xlinker -soname=$(NAME).so
+## Header privati Haiku necessari per i decorator.
+## Vengono cercati prima in sdk/private-headers/ (copia locale distribuita
+## con l'SDK), poi nei path standard di haiku_devel come fallback.
+SYSTEM_INCLUDE_PATHS = sdk/private-headers sdk/include
 
-## ─── Librerie di sistema Haiku ───────────────────────────────────────────────
-LIBS = -lbe -lroot
+LOCAL_INCLUDE_PATHS = sdk/private-headers sdk/include
 
-## ─── Target principale ───────────────────────────────────────────────────────
-TARGET = $(OUTPUT_DIR)/$(NAME).so
+OPTIMIZE = FULL
 
-.PHONY: all clean install uninstall help
+LOCALES =
 
-all: $(TARGET)
-	@echo ""
-	@echo "╔══════════════════════════════════════════════╗"
-	@echo "║  Build completato: $(TARGET)"
-	@echo "║  Usa 'make install' per installare."
-	@echo "╚══════════════════════════════════════════════╝"
+DEFINES = THEME_CONF_PATH='"$(shell pwd)/theme.conf"'
 
-$(TARGET): $(OBJS) | $(OUTPUT_DIR)
-	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
+WARNINGS =
 
-$(OUTPUT_DIR):
-	mkdir -p $(OUTPUT_DIR)
+SYMBOLS :=
 
-%.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+DEBUGGER :=
+
+COMPILER_FLAGS = -std=c++11
+
+LINKER_FLAGS =
+
+APP_VERSION :=
+
+DRIVER_PATH =
 
 ## ─── Installazione ───────────────────────────────────────────────────────────
-install: $(TARGET)
+INSTALL_DIR = /boot/home/config/non-packaged/add-ons/decorators
+
+## Il makefile-engine di Haiku produce i .so in objects.<arch>-*/
+## Questo target li copia nella cartella output/ e li installa.
+OBJECTS_DIR = $(shell ls -d objects.* 2>/dev/null | head -1)
+
+.PHONY: install uninstall help
+
+install: all
 	@mkdir -p $(INSTALL_DIR)
-	cp $(TARGET) $(INSTALL_DIR)/$(NAME).so
-	@echo "Installato in $(INSTALL_DIR)/$(NAME).so"
-	@echo "Seleziona '$(NAME)' nelle Preferenze Aspetto di Haiku."
+	@OBJECTS_DIR=$$(ls -d objects.* 2>/dev/null | head -1); \
+	if [ -z "$$OBJECTS_DIR" ]; then \
+		echo "ERRORE: nessuna cartella objects.* trovata. Esegui 'make' prima."; exit 1; \
+	fi; \
+	cp "$$OBJECTS_DIR/$(NAME)" $(INSTALL_DIR)/$(NAME); \
+	echo "✓ Installato: $(INSTALL_DIR)/$(NAME)"
+	@echo "Seleziona '$(NAME)' in Preferenze → Aspetto."
 
 uninstall:
-	rm -f $(INSTALL_DIR)/$(NAME).so
-	@echo "Rimosso $(INSTALL_DIR)/$(NAME).so"
-
-clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(INSTALL_DIR)/$(NAME)
+	@echo "Rimosso $(INSTALL_DIR)/$(NAME)"
 
 help:
-	@echo "Haiku Decorator SDK — Comandi disponibili:"
-	@echo ""
+	@echo "Haiku Decorator SDK — Comandi:"
 	@echo "  make              Compila il decorator"
-	@echo "  make install      Compila e installa in add-ons/decorators/"
+	@echo "  make install      Compila e installa"
 	@echo "  make uninstall    Rimuove il decorator installato"
 	@echo "  make clean        Rimuove i file compilati"
-	@echo "  make NAME=Foo     Usa 'Foo' come nome invece di quello in theme.conf"
+
+## ─── makefile-engine di Haiku ────────────────────────────────────────────────
+DEVEL_DIRECTORY := \
+    $(shell findpaths -r "makefile_engine" B_FIND_PATH_DEVELOP_DIRECTORY)
+
+include $(DEVEL_DIRECTORY)/etc/makefile-engine

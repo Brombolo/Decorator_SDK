@@ -16,8 +16,9 @@
 enum TabShape {
     TAB_SHAPE_FLAT = 0,
     TAB_SHAPE_ROUNDED,
-    TAB_SHAPE_SLANTED,
-    TAB_SHAPE_WAVE
+    TAB_SHAPE_SLANTED
+    // TAB_SHAPE_WAVE rimosso: path Bézier incompatibile con il ciclo di
+    // ridisegno sincrono di app_server.
 };
 
 enum EffectType {
