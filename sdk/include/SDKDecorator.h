@@ -14,11 +14,12 @@
 #include "ThemeConfig.h"
 #include "ThemeRenderer.h"
 
-#include <SATDecorator.h>   // /boot/system/develop/headers/private/servers/app/decorator/
-#include <DecorManager.h>   // contiene sia DecorAddOn che DecorManager
+#include <SATDecorator.h>
+#include <DecorManager.h>   // contiene DecorAddOn; include DecorInfo.h (stub in includes/)
 #include <Rect.h>
 #include <Region.h>
 #include <View.h>
+#include <image.h>
 
 class SDKDecorAddOn : public DecorAddOn {
 public:
