@@ -29,11 +29,11 @@ LIBS = $(STDCPPLIBS) be translation
 LIBPATHS =
 
 ## Header privati Haiku necessari per i decorator.
-## Vengono cercati prima in sdk/private-headers/ (copia locale distribuita
+## Vengono cercati nella cartella includes/ (da copiare da haiku_darkstyle)
 ## con l'SDK), poi nei path standard di haiku_devel come fallback.
-SYSTEM_INCLUDE_PATHS = sdk/private-headers sdk/include
+SYSTEM_INCLUDE_PATHS = includes sdk/include
 
-LOCAL_INCLUDE_PATHS = sdk/private-headers sdk/include
+LOCAL_INCLUDE_PATHS = includes sdk/include
 
 OPTIMIZE = FULL
 

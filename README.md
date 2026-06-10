@@ -24,10 +24,10 @@ nella cartella `FlatDecorator/includes/`.
 
 ```sh
 cp -r /percorso/haiku_darkstyle/FlatDecorator/includes/* \
-      sdk/private-headers/
+      includes/
 ```
 
-Serve farlo **una sola volta**. Vedi `sdk/private-headers/README.txt` per l'elenco esatto dei file necessari.
+Serve farlo **una sola volta**. Vedi `includes/README.txt` per l'elenco esatto dei file necessari.
 
 ### 2. Copia il tema di partenza
 

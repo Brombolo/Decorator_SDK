@@ -21,7 +21,7 @@ Li trovi già nel tuo repository `haiku_darkstyle`, nella cartella
 
 ```sh
 cp -r /percorso/haiku_darkstyle/FlatDecorator/includes/* \
-      sdk/private-headers/
+      includes/
 ```
 
 Serve farlo solo la prima volta.

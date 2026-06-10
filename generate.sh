@@ -44,13 +44,12 @@ if [ -z "$MAKEFILE_ENGINE" ]; then
 fi
 
 # ─── Verifica header privati ──────────────────────────────────────────────────
-if [ ! -f "$SCRIPT_DIR/sdk/private-headers/SATDecorator.h" ]; then
+if [ ! -f "$SCRIPT_DIR/includes/SATDecorator.h" ]; then
     echo ""
-    echo "⚠  Header privati non trovati in sdk/private-headers/"
+    echo "⚠  Header privati non trovati in includes/"
     echo ""
-    echo "   Prima di compilare devi copiare gli header necessari:"
-    echo "   Scarica https://github.com/CodeforEvolution/DecoratorSDK
-   e copia la sua cartella "includes/" dentro sdk/private-headers/"
+    echo "   Copia la cartella includes/ dal tuo repository haiku_darkstyle:"
+    echo "   cp -r /percorso/haiku_darkstyle/FlatDecorator/includes/* includes/"
     echo ""
     exit 1
 fi
