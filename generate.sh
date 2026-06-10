@@ -81,7 +81,7 @@ make NAME="$NAME" 2>&1
 # ─── Installazione ────────────────────────────────────────────────────────────
 if [ "$NO_INSTALL" -eq 0 ]; then
     echo "→ Installazione..."
-    make NAME="$NAME" install 2>&1
+    make NAME="$NAME" deploy 2>&1
     echo ""
     echo "════════════════════════════════════════════"
     echo "  ✓ Installato: $NAME"
