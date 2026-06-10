@@ -1,20 +1,5 @@
 /*
  * Haiku Decorator SDK — SDKDecorator.cpp
- *
- * Tutto il disegno usa fDrawingEngine (membro di Decorator)
- * tramite i suoi metodi pubblici già dichiarati in Decorator.h:
- *
- *   fDrawingEngine->StrokeLine(...)
- *   fDrawingEngine->StrokeRect(...)
- *   fDrawingEngine->FillRect(...)
- *   fDrawingEngine->FillEllipse(...)
- *   fDrawingEngine->FillRect(..., BGradientLinear)
- *   fDrawingEngine->DrawString(...)
- *   fDrawingEngine->SetHighColor(...)
- *   fDrawingEngine->SetLowColor(...)
- *   fDrawingEngine->SetDrawingMode(...)
- *
- * Nessun include di DrawingEngine.h, ServerBitmap.h o BitmapDrawingEngine.h.
  */
 
 #include "SDKDecorator.h"
@@ -24,7 +9,7 @@
 #include <new>
 #include <stdio.h>
 #include <algorithm>
-#include <libgen.h>     // dirname()
+#include <libgen.h>
 
 #include <InterfaceDefs.h>
 #include <GradientLinear.h>
@@ -51,35 +36,29 @@ Decorator* SDKDecorAddOn::_AllocateDecorator(DesktopSettings& settings,
 {
     ThemeConfig config;
     status_t err = ConfigReader::Load(THEME_CONF_PATH, config);
-    if (err != B_OK) {
-        fprintf(stderr, "[SDKDecorator] Errore caricamento theme.conf: %s\n",
+    if (err != B_OK)
+        fprintf(stderr, "[SDKDecorator] Errore theme.conf: %s\n",
                 ConfigReader::LastError());
-    }
     return new (std::nothrow) SDKDecorator(settings, rect, desktop, config);
 }
 
 // ─── SDKDecorator ─────────────────────────────────────────────────────────────
 
 SDKDecorator::SDKDecorator(DesktopSettings& settings,
-                             BRect rect,
-                             Desktop* desktop,
+                             BRect rect, Desktop* desktop,
                              const ThemeConfig& config)
     : SATDecorator(settings, rect, desktop),
       fConfig(config),
       fRenderer(fConfig),
       fTabPainter(nullptr)
 {
-    // Inizializza TabPainter se necessario
     if (fConfig.tab.effect.type == EFFECT_TEXTURE
         && !fConfig.tab.texture.file.IsEmpty())
     {
-        // Ricava la directory del conf dal path baked-in
         char confPath[] = THEME_CONF_PATH;
         char* dir = dirname(confPath);
         fTabPainter = new (std::nothrow) TabPainter(fConfig.tab.texture, dir);
         if (fTabPainter && !fTabPainter->IsValid()) {
-            fprintf(stderr, "[SDKDecorator] Texture non trovata: %s/%s\n",
-                    dir, fConfig.tab.texture.file.String());
             delete fTabPainter;
             fTabPainter = nullptr;
         }
@@ -121,12 +100,10 @@ void SDKDecorator::GetComponentColors(Component component,
             _colors[COLOR_TAB_TEXT]   = cs.text_color;
             break;
         }
-
         case COMPONENT_CLOSE_BUTTON:
         case COMPONENT_ZOOM_BUTTON: {
             const ButtonColorSet& bcs = (component == COMPONENT_CLOSE_BUTTON)
-                ? fConfig.buttons.close
-                : fConfig.buttons.zoom;
+                ? fConfig.buttons.close : fConfig.buttons.zoom;
             _colors[COLOR_BUTTON] = focused
                 ? bcs.color_normal
                 : ThemeRenderer::Darken(bcs.color_normal, 0.15f);
@@ -134,13 +111,10 @@ void SDKDecorator::GetComponentColors(Component component,
                 ThemeRenderer::Lighten(bcs.color_normal, 0.15f);
             break;
         }
-
         default: {
-            // Bordi: usa i 6 colori calcolati da ThemeRenderer
-            rgb_color borderColors[6];
-            fRenderer.CalcBorderColors(borderColors, focused || stackTile);
-            for (int i = 0; i < 6; i++)
-                _colors[i] = borderColors[i];
+            rgb_color bc[6];
+            fRenderer.CalcBorderColors(bc, focused || stackTile);
+            for (int i = 0; i < 6; i++) _colors[i] = bc[i];
             break;
         }
     }
@@ -163,7 +137,6 @@ void SDKDecorator::_DrawFrame(BRect invalid) {
     if (invalid.Intersects(fRightBorder))
         _PaintBorderEdge(fRightBorder, focused, false, false);
 
-    // Resize corner
     if (!(fTopTab->flags & B_NOT_RESIZABLE))
         _PaintResizeCorner(fResizeRect, focused);
 }
@@ -181,7 +154,6 @@ void SDKDecorator::_PaintBorderEdge(const BRect& rect, bool focused,
         case BORDER_FLAT:
             fDrawingEngine->FillRect(r, colors[2]);
             break;
-
         case BORDER_INSET:
             fDrawingEngine->FillRect(r, colors[2]);
             fDrawingEngine->StrokeLine(r.LeftTop(),    r.RightTop(),    colors[3]);
@@ -189,59 +161,47 @@ void SDKDecorator::_PaintBorderEdge(const BRect& rect, bool focused,
             fDrawingEngine->StrokeLine(r.RightTop(),   r.RightBottom(), colors[1]);
             fDrawingEngine->StrokeLine(r.LeftBottom(), r.RightBottom(), colors[1]);
             break;
-
         case BORDER_BEVELED:
         default:
             for (int8 i = 0; i < n; i++) {
-                fDrawingEngine->StrokeLine(
-                    BPoint(r.left,  r.top),
-                    BPoint(r.right, r.top),    colors[i]);
-                fDrawingEngine->StrokeLine(
-                    BPoint(r.left,  r.top),
-                    BPoint(r.left,  r.bottom), colors[i]);
-                int ci = (n - 1 - i);
-                rgb_color sc = (ci >= 3) ? colors[5] : colors[3];
-                fDrawingEngine->StrokeLine(
-                    BPoint(r.right, r.top),
-                    BPoint(r.right, r.bottom), sc);
-                fDrawingEngine->StrokeLine(
-                    BPoint(r.left,  r.bottom),
-                    BPoint(r.right, r.bottom), sc);
+                fDrawingEngine->StrokeLine(BPoint(r.left,  r.top),
+                                            BPoint(r.right, r.top),    colors[i]);
+                fDrawingEngine->StrokeLine(BPoint(r.left,  r.top),
+                                            BPoint(r.left,  r.bottom), colors[i]);
+                rgb_color sc = (n - 1 - i >= 3) ? colors[5] : colors[3];
+                fDrawingEngine->StrokeLine(BPoint(r.right, r.top),
+                                            BPoint(r.right, r.bottom), sc);
+                fDrawingEngine->StrokeLine(BPoint(r.left,  r.bottom),
+                                            BPoint(r.right, r.bottom), sc);
                 r.InsetBy(1, 1);
             }
             break;
     }
 }
 
-void SDKDecorator::_PaintResizeCorner(const BRect& rect, bool focused) {
+void SDKDecorator::_PaintResizeCorner(const BRect& rect, bool /*focused*/) {
     if (fConfig.resize_corner.style == RESIZE_NONE) return;
-
-    rgb_color c = fConfig.resize_corner.color;
+    rgb_color c     = fConfig.resize_corner.color;
     rgb_color light = ThemeRenderer::Lighten(c, 0.20f);
 
     if (fConfig.resize_corner.style == RESIZE_LINES) {
         int32 sz = fConfig.resize_corner.size;
-        fDrawingEngine->StrokeLine(
-            BPoint(rect.right - sz, rect.bottom),
-            BPoint(rect.right,      rect.bottom), c);
-        fDrawingEngine->StrokeLine(
-            BPoint(rect.right, rect.bottom - sz),
-            BPoint(rect.right, rect.bottom),      c);
+        fDrawingEngine->StrokeLine(BPoint(rect.right - sz, rect.bottom),
+                                    BPoint(rect.right,      rect.bottom), c);
+        fDrawingEngine->StrokeLine(BPoint(rect.right, rect.bottom - sz),
+                                    BPoint(rect.right, rect.bottom),      c);
         return;
     }
-
-    // RESIZE_KNOB — punti a griglia stile Haiku
     float x = rect.right  - 2.0f;
     float y = rect.bottom - 2.0f;
     for (int8 i = 1; i <= 3; i++) {
         for (int8 j = 1; j <= i; j++) {
             fDrawingEngine->StrokePoint(
-                BPoint(x - 3.0f * j,       y - 3.0f * (4 - i)), c);
+                BPoint(x - 3.0f * j,         y - 3.0f * (4 - i)),       c);
             fDrawingEngine->StrokePoint(
-                BPoint(x - 3.0f * j + 1.0f, y - 3.0f * (4 - i) + 1.0f), light);
+                BPoint(x - 3.0f * j + 1.0f,  y - 3.0f * (4 - i) + 1.0f), light);
         }
     }
-    (void)focused;
 }
 
 // ─── _DrawTab ─────────────────────────────────────────────────────────────────
@@ -249,11 +209,11 @@ void SDKDecorator::_PaintResizeCorner(const BRect& rect, bool focused) {
 void SDKDecorator::_DrawTab(Decorator::Tab* _tab, BRect invalid) {
     Decorator::Tab* tab = static_cast<Decorator::Tab*>(_tab);
     const BRect& tabRect = tab->tabRect;
-
     if (!tabRect.IsValid() || !invalid.Intersects(tabRect)) return;
 
     bool focused   = tab->buttonFocus;
-    bool stackTile = (tab->currentHighlight == HIGHLIGHT_STACK_AND_TILE);
+    // Rileva Stack&Tile dal highlight corrente (campo "highlight" in Tab)
+    bool stackTile = (tab->highlight == HIGHLIGHT_STACK_AND_TILE);
 
     _PaintTab(tab, tabRect, focused, stackTile);
     _DrawTitle(tab, tabRect);
@@ -270,15 +230,13 @@ void SDKDecorator::_PaintTab(Decorator::Tab* /*tab*/, const BRect& tabRect,
     TabDrawSpec spec = fRenderer.CalcTab(tabRect, focused, stackTile);
     BRect fill = tabRect.InsetByCopy(2.0f, 2.0f);
 
-    // ─── Bordo esterno ────────────────────────────────────────────────────────
+    // Bordi
     fDrawingEngine->StrokeLine(tabRect.LeftTop(),  tabRect.LeftBottom(),
                                 spec.border_outer);
     fDrawingEngine->StrokeLine(tabRect.LeftTop(),  tabRect.RightTop(),
                                 spec.border_outer);
     fDrawingEngine->StrokeLine(tabRect.RightTop(), tabRect.RightBottom(),
                                 spec.border_outer_shadow);
-
-    // ─── Bevel interno ────────────────────────────────────────────────────────
     BRect inner = tabRect.InsetByCopy(1.0f, 1.0f);
     fDrawingEngine->StrokeLine(inner.LeftTop(),  inner.LeftBottom(),
                                 spec.bevel_light);
@@ -287,11 +245,11 @@ void SDKDecorator::_PaintTab(Decorator::Tab* /*tab*/, const BRect& tabRect,
     fDrawingEngine->StrokeLine(inner.RightTop(), inner.RightBottom(),
                                 spec.bevel_shadow);
 
-    // ─── Fill ─────────────────────────────────────────────────────────────────
+    // Fill / gradiente
     if (spec.gradient.active) {
         BGradientLinear gradient;
         gradient.SetStart(BPoint(spec.gradient.start_x, spec.gradient.start_y));
-        gradient.SetEnd(BPoint(spec.gradient.end_x,   spec.gradient.end_y));
+        gradient.SetEnd(BPoint(spec.gradient.end_x,     spec.gradient.end_y));
         gradient.AddColor(spec.gradient.color_start, 0);
         gradient.AddColor(spec.gradient.color_end,   255);
         fDrawingEngine->FillRect(fill, gradient);
@@ -299,19 +257,19 @@ void SDKDecorator::_PaintTab(Decorator::Tab* /*tab*/, const BRect& tabRect,
         fDrawingEngine->FillRect(fill, spec.fill_color);
     }
 
-    // ─── Texture overlay ──────────────────────────────────────────────────────
+    // Texture
     if (fConfig.tab.effect.type == EFFECT_TEXTURE && fTabPainter != nullptr) {
-        BBitmap* texBmp = fTabPainter->CreateBlendedBitmap(fill, spec.fill_color);
-        if (texBmp) {
+        BBitmap* bmp = fTabPainter->CreateBlendedBitmap(fill, spec.fill_color);
+        if (bmp) {
             drawing_mode old;
             fDrawingEngine->SetDrawingMode(B_OP_COPY, old);
-            fDrawingEngine->DrawBitmap(texBmp, fill.OffsetToCopy(0, 0), fill);
+            fDrawingEngine->DrawBitmap(bmp, fill.OffsetToCopy(0, 0), fill);
             fDrawingEngine->SetDrawingMode(old);
-            delete texBmp;
+            delete bmp;
         }
     }
 
-    // ─── Glass overlay ────────────────────────────────────────────────────────
+    // Glass
     if (spec.glass_enabled) {
         drawing_mode old;
         fDrawingEngine->SetDrawingMode(B_OP_ALPHA, old);
@@ -319,26 +277,22 @@ void SDKDecorator::_PaintTab(Decorator::Tab* /*tab*/, const BRect& tabRect,
         fDrawingEngine->SetDrawingMode(old);
     }
 
-    // ─── Inner glow ───────────────────────────────────────────────────────────
-    if (spec.inner_glow_enabled) {
-        fDrawingEngine->StrokeLine(
-            BPoint(fill.left,  fill.top),
-            BPoint(fill.right, fill.top),
-            spec.inner_glow_color);
-    }
+    // Inner glow
+    if (spec.inner_glow_enabled)
+        fDrawingEngine->StrokeLine(BPoint(fill.left,  fill.top),
+                                    BPoint(fill.right, fill.top),
+                                    spec.inner_glow_color);
 
-    // ─── Separatore ───────────────────────────────────────────────────────────
-    if (spec.separator_enabled) {
+    // Separatore
+    if (spec.separator_enabled)
         fDrawingEngine->StrokeLine(
             BPoint(tabRect.left  + 2, tabRect.bottom + 1),
             BPoint(tabRect.right - 2, tabRect.bottom + 1),
             spec.separator_color);
-    }
 
-    // ─── Stack & Tile indicator ───────────────────────────────────────────────
-    if (spec.stack_indicator) {
+    // Stack&Tile indicator
+    if (spec.stack_indicator)
         fDrawingEngine->FillEllipse(spec.indicator_rect, spec.indicator_color);
-    }
 }
 
 // ─── _DrawTitle ───────────────────────────────────────────────────────────────
@@ -349,8 +303,9 @@ void SDKDecorator::_DrawTitle(Decorator::Tab* _tab, BRect /*r*/) {
     const BRect& closeRect = tab->closeRect;
     const BRect& zoomRect  = tab->zoomRect;
 
+    // Leggiamo i colori direttamente da GetComponentColors (è public in Decorator)
     ComponentColors colors;
-    _GetComponentColors(COMPONENT_TAB, colors, tab);
+    GetComponentColors(COMPONENT_TAB, tab->highlight, colors, tab);
 
     fDrawingEngine->SetDrawingMode(B_OP_OVER);
     fDrawingEngine->SetHighColor(colors[COLOR_TAB_TEXT]);
@@ -360,11 +315,9 @@ void SDKDecorator::_DrawTitle(Decorator::Tab* _tab, BRect /*r*/) {
     font_height fh;
     fDrawState.Font().GetHeight(fh);
 
-    // Posizione X iniziale (dopo il pulsante close)
     float startX = closeRect.IsValid()
         ? closeRect.right + tab->textOffset
         : tabRect.left    + tab->textOffset;
-
     float titleWidth = fDrawState.Font().StringWidth(
         tab->truncatedTitle.String(), tab->truncatedTitleLength);
 
@@ -382,16 +335,13 @@ void SDKDecorator::_DrawTitle(Decorator::Tab* _tab, BRect /*r*/) {
             titleX = endX - titleWidth;
             break;
         }
-        case TITLE_LEFT:
-        default:
-            break;
+        default: break;
     }
 
     float titleY = floorf(
         ((tabRect.top + 2.0f) + tabRect.bottom + fh.ascent + fh.descent)
         / 2.0f - fh.descent + 0.5f);
 
-    // Ombra testo
     if (fConfig.title.shadow) {
         fDrawingEngine->SetHighColor(fConfig.title.shadow_color);
         fDrawingEngine->DrawString(tab->truncatedTitle.String(),
@@ -399,7 +349,6 @@ void SDKDecorator::_DrawTitle(Decorator::Tab* _tab, BRect /*r*/) {
                                     BPoint(titleX + 1, titleY + 1));
         fDrawingEngine->SetHighColor(colors[COLOR_TAB_TEXT]);
     }
-
     fDrawingEngine->DrawString(tab->truncatedTitle.String(),
                                 tab->truncatedTitleLength,
                                 BPoint(titleX, titleY));
@@ -409,110 +358,63 @@ void SDKDecorator::_DrawTitle(Decorator::Tab* _tab, BRect /*r*/) {
 // ─── Pulsanti ─────────────────────────────────────────────────────────────────
 
 void SDKDecorator::_PaintButton(const BRect& rect, const ButtonDrawSpec& spec) {
-    // Fill base
     fDrawingEngine->FillRect(rect, spec.bg_color);
-
     switch (spec.shape) {
         case BTN_CIRCLE:
             fDrawingEngine->FillEllipse(rect, spec.bg_color);
             fDrawingEngine->StrokeEllipse(rect, spec.shadow);
-            // Bevel interno cerchio
-            {
-                BRect inner = rect.InsetByCopy(1.0f, 1.0f);
-                fDrawingEngine->StrokeEllipse(inner, spec.highlight);
-            }
+            { BRect inner = rect.InsetByCopy(1.0f, 1.0f);
+              fDrawingEngine->StrokeEllipse(inner, spec.highlight); }
             break;
-
-        case BTN_ROUNDED_SQUARE: {
-            // Bevel a 4 lati
-            fDrawingEngine->StrokeLine(rect.LeftTop(),    rect.RightTop(),
-                                        spec.highlight);
-            fDrawingEngine->StrokeLine(rect.LeftTop(),    rect.LeftBottom(),
-                                        spec.highlight);
-            fDrawingEngine->StrokeLine(rect.RightTop(),   rect.RightBottom(),
-                                        spec.shadow);
-            fDrawingEngine->StrokeLine(rect.LeftBottom(), rect.RightBottom(),
-                                        spec.shadow);
-            break;
-        }
-
-        case BTN_DIAMOND:
-            // Linee diagonali per creare aspetto a diamante
-            fDrawingEngine->StrokeLine(rect.LeftTop(),    rect.RightBottom(),
-                                        spec.shadow);
-            fDrawingEngine->StrokeLine(rect.RightTop(),   rect.LeftBottom(),
-                                        spec.shadow);
-            break;
-
+        case BTN_ROUNDED_SQUARE:
         case BTN_SQUARE:
         default:
-            fDrawingEngine->StrokeLine(rect.LeftTop(),    rect.RightTop(),
-                                        spec.highlight);
-            fDrawingEngine->StrokeLine(rect.LeftTop(),    rect.LeftBottom(),
-                                        spec.highlight);
-            fDrawingEngine->StrokeLine(rect.RightTop(),   rect.RightBottom(),
-                                        spec.shadow);
-            fDrawingEngine->StrokeLine(rect.LeftBottom(), rect.RightBottom(),
-                                        spec.shadow);
+            fDrawingEngine->StrokeLine(rect.LeftTop(),    rect.RightTop(),    spec.highlight);
+            fDrawingEngine->StrokeLine(rect.LeftTop(),    rect.LeftBottom(),  spec.highlight);
+            fDrawingEngine->StrokeLine(rect.RightTop(),   rect.RightBottom(), spec.shadow);
+            fDrawingEngine->StrokeLine(rect.LeftBottom(), rect.RightBottom(), spec.shadow);
+            break;
+        case BTN_DIAMOND:
+            fDrawingEngine->StrokeLine(rect.LeftTop(),  rect.RightBottom(), spec.shadow);
+            fDrawingEngine->StrokeLine(rect.RightTop(), rect.LeftBottom(),  spec.shadow);
             break;
     }
-
     _PaintButtonIcon(rect.InsetByCopy(2.0f, 2.0f), spec);
 }
 
 void SDKDecorator::_PaintButtonIcon(const BRect& rect, const ButtonDrawSpec& spec) {
     if (spec.icon_style == ICON_NONE) return;
-
     float cx = rect.left + rect.Width()  / 2.0f;
     float cy = rect.top  + rect.Height() / 2.0f;
     float r  = (min(rect.Width(), rect.Height()) * spec.icon_scale) * 0.5f;
-
     if (spec.pressed) { cx += 0.5f; cy += 0.5f; }
-
     rgb_color ic = spec.icon_color;
 
     switch (spec.icon_style) {
         case ICON_DOT:
             fDrawingEngine->FillEllipse(
-                BRect(cx - r * 0.35f, cy - r * 0.35f,
-                      cx + r * 0.35f, cy + r * 0.35f), ic);
+                BRect(cx-r*0.35f, cy-r*0.35f, cx+r*0.35f, cy+r*0.35f), ic);
             break;
-
-        case ICON_CROSS_X:
-            // X per entrambi i pulsanti
-            fDrawingEngine->StrokeLine(BPoint(cx - r, cy - r),
-                                        BPoint(cx + r, cy + r), ic);
-            fDrawingEngine->StrokeLine(BPoint(cx + r, cy - r),
-                                        BPoint(cx - r, cy + r), ic);
-            break;
-
         case ICON_CLASSIC_BE:
             if (spec.is_close) {
-                fDrawingEngine->StrokeLine(BPoint(cx - r, cy - r),
-                                            BPoint(cx + r, cy + r), ic);
-                fDrawingEngine->StrokeLine(BPoint(cx + r, cy - r),
-                                            BPoint(cx - r, cy + r), ic);
+                fDrawingEngine->StrokeLine(BPoint(cx-r,cy-r),BPoint(cx+r,cy+r),ic);
+                fDrawingEngine->StrokeLine(BPoint(cx+r,cy-r),BPoint(cx-r,cy+r),ic);
             } else {
-                // Frecce incrociate (maximize classico BeOS)
-                fDrawingEngine->StrokeLine(BPoint(cx - r, cy),
-                                            BPoint(cx + r, cy), ic);
-                fDrawingEngine->StrokeLine(BPoint(cx, cy - r),
-                                            BPoint(cx, cy + r), ic);
+                fDrawingEngine->StrokeLine(BPoint(cx-r,cy),  BPoint(cx+r,cy),  ic);
+                fDrawingEngine->StrokeLine(BPoint(cx,  cy-r),BPoint(cx,  cy+r),ic);
             }
             break;
-
+        case ICON_CROSS_X:
+            fDrawingEngine->StrokeLine(BPoint(cx-r,cy-r),BPoint(cx+r,cy+r),ic);
+            fDrawingEngine->StrokeLine(BPoint(cx+r,cy-r),BPoint(cx-r,cy+r),ic);
+            break;
         case ICON_SYMBOL:
         default:
             if (spec.is_close) {
-                // X
-                fDrawingEngine->StrokeLine(BPoint(cx - r, cy - r),
-                                            BPoint(cx + r, cy + r), ic);
-                fDrawingEngine->StrokeLine(BPoint(cx + r, cy - r),
-                                            BPoint(cx - r, cy + r), ic);
+                fDrawingEngine->StrokeLine(BPoint(cx-r,cy-r),BPoint(cx+r,cy+r),ic);
+                fDrawingEngine->StrokeLine(BPoint(cx+r,cy-r),BPoint(cx-r,cy+r),ic);
             } else {
-                // Quadrato (zoom/maximize)
-                fDrawingEngine->StrokeRect(
-                    BRect(cx - r, cy - r, cx + r, cy + r), ic);
+                fDrawingEngine->StrokeRect(BRect(cx-r,cy-r,cx+r,cy+r),ic);
             }
             break;
     }
@@ -522,11 +424,8 @@ void SDKDecorator::_DrawClose(Decorator::Tab* _tab, bool direct, BRect rect) {
     Decorator::Tab* tab = static_cast<Decorator::Tab*>(_tab);
     bool prev = fDrawingEngine->CopyToFrontEnabled();
     fDrawingEngine->SetCopyToFrontEnabled(direct);
-
-    ButtonDrawSpec spec = fRenderer.CalcButton(true, tab->closePressed,
-                                                tab->buttonFocus);
+    ButtonDrawSpec spec = fRenderer.CalcButton(true, tab->closePressed, tab->buttonFocus);
     _PaintButton(rect, spec);
-
     fDrawingEngine->SetCopyToFrontEnabled(prev);
 }
 
@@ -535,28 +434,20 @@ void SDKDecorator::_DrawZoom(Decorator::Tab* _tab, bool direct, BRect rect) {
     Decorator::Tab* tab = static_cast<Decorator::Tab*>(_tab);
     bool prev = fDrawingEngine->CopyToFrontEnabled();
     fDrawingEngine->SetCopyToFrontEnabled(direct);
-
-    ButtonDrawSpec spec = fRenderer.CalcButton(false, tab->zoomPressed,
-                                                tab->buttonFocus);
+    ButtonDrawSpec spec = fRenderer.CalcButton(false, tab->zoomPressed, tab->buttonFocus);
     _PaintButton(rect, spec);
-
     fDrawingEngine->SetCopyToFrontEnabled(prev);
 }
 
-void SDKDecorator::_DrawMinimize(Decorator::Tab* /*tab*/, bool /*direct*/,
-                                  BRect /*rect*/) {
-    // Non implementato
-}
+void SDKDecorator::_DrawMinimize(Decorator::Tab*, bool, BRect) {}
 
 void SDKDecorator::_GetButtonSizeAndOffset(const BRect& tabRect,
-                                            float* offset,
-                                            float* size,
+                                            float* offset, float* size,
                                             float* inset) const
 {
-    float tabHeight = tabRect.Height();
     *offset = (float)fConfig.buttons.margin;
     *inset  = 0.0f;
-    *size   = tabHeight - (float)fConfig.buttons.margin * 2.0f;
+    *size   = tabRect.Height() - (float)fConfig.buttons.margin * 2.0f;
     if (*size > (float)fConfig.buttons.size)
         *size = (float)fConfig.buttons.size;
     if (*size < 0) *size = 0;

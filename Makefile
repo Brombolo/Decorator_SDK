@@ -25,8 +25,8 @@ LIBS = $(STDCPPLIBS) be translation
 LIBPATHS =
 
 ## Header privati Haiku (cartella includes/ copiata da haiku_darkstyle)
-SYSTEM_INCLUDE_PATHS = includes sdk/include
-LOCAL_INCLUDE_PATHS  = includes sdk/include
+SYSTEM_INCLUDE_PATHS = includes sdk/headers
+LOCAL_INCLUDE_PATHS  = includes sdk/headers
 
 OPTIMIZE        = FULL
 LOCALES         =
