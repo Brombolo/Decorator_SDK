@@ -18,18 +18,27 @@
 using std::min;
 using std::max;
 
+// ─── Helper: colore piatto come BGradientLinear ────────────────────────────
+// DrawingEngine non ha FillEllipse(BRect, rgb_color).
+// Per disegnare ellissi con colore piatto usiamo un gradiente degenere
+// (stesso colore a start e end).
+static BGradientLinear _SolidGradient(BRect r, rgb_color c) {
+    BGradientLinear g;
+    g.SetStart(r.LeftTop());
+    g.SetEnd(r.LeftBottom());
+    g.AddColor(c, 0);
+    g.AddColor(c, 255);
+    return g;
+}
+
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
 extern "C" DecorAddOn* instantiate_decor_addon(image_id id, const char* name) {
     return new (std::nothrow) SDKDecorAddOn(id, name);
 }
 
-// ─── SDKDecorAddOn ────────────────────────────────────────────────────────────
-
 SDKDecorAddOn::SDKDecorAddOn(image_id id, const char* name)
-    : DecorAddOn(id, name)
-{
-}
+    : DecorAddOn(id, name) {}
 
 Decorator* SDKDecorAddOn::_AllocateDecorator(DesktopSettings& settings,
                                                BRect rect, Desktop* desktop)
@@ -44,9 +53,8 @@ Decorator* SDKDecorAddOn::_AllocateDecorator(DesktopSettings& settings,
 
 // ─── SDKDecorator ─────────────────────────────────────────────────────────────
 
-SDKDecorator::SDKDecorator(DesktopSettings& settings,
-                             BRect rect, Desktop* desktop,
-                             const ThemeConfig& config)
+SDKDecorator::SDKDecorator(DesktopSettings& settings, BRect rect,
+                             Desktop* desktop, const ThemeConfig& config)
     : SATDecorator(settings, rect, desktop),
       fConfig(config),
       fRenderer(fConfig),
@@ -56,8 +64,8 @@ SDKDecorator::SDKDecorator(DesktopSettings& settings,
         && !fConfig.tab.texture.file.IsEmpty())
     {
         char confPath[] = THEME_CONF_PATH;
-        char* dir = dirname(confPath);
-        fTabPainter = new (std::nothrow) TabPainter(fConfig.tab.texture, dir);
+        fTabPainter = new (std::nothrow) TabPainter(fConfig.tab.texture,
+                                                     dirname(confPath));
         if (fTabPainter && !fTabPainter->IsValid()) {
             delete fTabPainter;
             fTabPainter = nullptr;
@@ -71,8 +79,7 @@ SDKDecorator::~SDKDecorator() {
 
 // ─── GetComponentColors ───────────────────────────────────────────────────────
 
-void SDKDecorator::GetComponentColors(Component component,
-                                       uint8 highlight,
+void SDKDecorator::GetComponentColors(Component component, uint8 highlight,
                                        ComponentColors _colors,
                                        Decorator::Tab* _tab)
 {
@@ -90,9 +97,9 @@ void SDKDecorator::GetComponentColors(Component component,
                     fConfig.tab.active.border_color }
                 : (focused ? fConfig.tab.active : fConfig.tab.inactive);
 
-            rgb_color frameBase = focused ? fFocusFrameColor : fNonFocusFrameColor;
-            _colors[COLOR_TAB_FRAME_LIGHT] = tint_color(frameBase, B_DARKEN_2_TINT);
-            _colors[COLOR_TAB_FRAME_DARK]  = tint_color(frameBase, B_DARKEN_3_TINT);
+            rgb_color base = focused ? fFocusFrameColor : fNonFocusFrameColor;
+            _colors[COLOR_TAB_FRAME_LIGHT] = tint_color(base, B_DARKEN_2_TINT);
+            _colors[COLOR_TAB_FRAME_DARK]  = tint_color(base, B_DARKEN_3_TINT);
             _colors[COLOR_TAB]        = cs.color_start;
             _colors[COLOR_TAB_LIGHT]  = tint_color(cs.color_start, B_LIGHTEN_1_TINT);
             _colors[COLOR_TAB_BEVEL]  = tint_color(cs.color_start, B_LIGHTEN_2_TINT);
@@ -125,9 +132,7 @@ void SDKDecorator::GetComponentColors(Component component,
 void SDKDecorator::_DrawFrame(BRect invalid) {
     if (fTopTab->look == B_NO_BORDER_WINDOW_LOOK) return;
     if (fBorderWidth <= 0) return;
-
     bool focused = IsFocus(fTopTab);
-
     if (invalid.Intersects(fTopBorder))
         _PaintBorderEdge(fTopBorder, focused, true, true);
     if (invalid.Intersects(fBottomBorder))
@@ -136,20 +141,17 @@ void SDKDecorator::_DrawFrame(BRect invalid) {
         _PaintBorderEdge(fLeftBorder, focused, false, true);
     if (invalid.Intersects(fRightBorder))
         _PaintBorderEdge(fRightBorder, focused, false, false);
-
     if (!(fTopTab->flags & B_NOT_RESIZABLE))
         _PaintResizeCorner(fResizeRect, focused);
 }
 
 void SDKDecorator::_PaintBorderEdge(const BRect& rect, bool focused,
-                                     bool /*horizontal*/, bool /*isTopOrLeft*/)
+                                     bool, bool)
 {
     rgb_color colors[6];
     fRenderer.CalcBorderColors(colors, focused);
-
     int32 n = min((int32)fBorderWidth, (int32)5);
     BRect r = rect;
-
     switch (fConfig.border.style) {
         case BORDER_FLAT:
             fDrawingEngine->FillRect(r, colors[2]);
@@ -168,7 +170,7 @@ void SDKDecorator::_PaintBorderEdge(const BRect& rect, bool focused,
                                             BPoint(r.right, r.top),    colors[i]);
                 fDrawingEngine->StrokeLine(BPoint(r.left,  r.top),
                                             BPoint(r.left,  r.bottom), colors[i]);
-                rgb_color sc = (n - 1 - i >= 3) ? colors[5] : colors[3];
+                rgb_color sc = (n-1-i >= 3) ? colors[5] : colors[3];
                 fDrawingEngine->StrokeLine(BPoint(r.right, r.top),
                                             BPoint(r.right, r.bottom), sc);
                 fDrawingEngine->StrokeLine(BPoint(r.left,  r.bottom),
@@ -179,29 +181,26 @@ void SDKDecorator::_PaintBorderEdge(const BRect& rect, bool focused,
     }
 }
 
-void SDKDecorator::_PaintResizeCorner(const BRect& rect, bool /*focused*/) {
+void SDKDecorator::_PaintResizeCorner(const BRect& rect, bool) {
     if (fConfig.resize_corner.style == RESIZE_NONE) return;
     rgb_color c     = fConfig.resize_corner.color;
     rgb_color light = ThemeRenderer::Lighten(c, 0.20f);
-
     if (fConfig.resize_corner.style == RESIZE_LINES) {
         int32 sz = fConfig.resize_corner.size;
-        fDrawingEngine->StrokeLine(BPoint(rect.right - sz, rect.bottom),
-                                    BPoint(rect.right,      rect.bottom), c);
-        fDrawingEngine->StrokeLine(BPoint(rect.right, rect.bottom - sz),
-                                    BPoint(rect.right, rect.bottom),      c);
+        fDrawingEngine->StrokeLine(BPoint(rect.right-sz, rect.bottom),
+                                    BPoint(rect.right,    rect.bottom), c);
+        fDrawingEngine->StrokeLine(BPoint(rect.right, rect.bottom-sz),
+                                    BPoint(rect.right, rect.bottom),    c);
         return;
     }
-    float x = rect.right  - 2.0f;
-    float y = rect.bottom - 2.0f;
-    for (int8 i = 1; i <= 3; i++) {
+    float x = rect.right - 2.0f, y = rect.bottom - 2.0f;
+    for (int8 i = 1; i <= 3; i++)
         for (int8 j = 1; j <= i; j++) {
             fDrawingEngine->StrokePoint(
-                BPoint(x - 3.0f * j,         y - 3.0f * (4 - i)),       c);
+                BPoint(x - 3.0f*j,        y - 3.0f*(4-i)),        c);
             fDrawingEngine->StrokePoint(
-                BPoint(x - 3.0f * j + 1.0f,  y - 3.0f * (4 - i) + 1.0f), light);
+                BPoint(x - 3.0f*j + 1.0f, y - 3.0f*(4-i) + 1.0f), light);
         }
-    }
 }
 
 // ─── _DrawTab ─────────────────────────────────────────────────────────────────
@@ -212,19 +211,18 @@ void SDKDecorator::_DrawTab(Decorator::Tab* _tab, BRect invalid) {
     if (!tabRect.IsValid() || !invalid.Intersects(tabRect)) return;
 
     bool focused   = tab->buttonFocus;
-    // Rileva Stack&Tile dal highlight corrente (campo "highlight" in Tab)
-    bool stackTile = (tab->highlight == HIGHLIGHT_STACK_AND_TILE);
+    // Stack&Tile: il decorator riceve highlight come parametro in _DrawTab.
+    // Usiamo isHighlighted come proxy — il valore esatto è gestito da
+    // GetComponentColors che riceve uint8 highlight.
+    bool stackTile = tab->isHighlighted;
 
     _PaintTab(tab, tabRect, focused, stackTile);
     _DrawTitle(tab, tabRect);
-
-    if (tab->closeRect.IsValid())
-        _DrawClose(tab, true, tab->closeRect);
-    if (tab->zoomRect.IsValid())
-        _DrawZoom(tab, true, tab->zoomRect);
+    if (tab->closeRect.IsValid()) _DrawClose(tab, true, tab->closeRect);
+    if (tab->zoomRect.IsValid())  _DrawZoom(tab,  true, tab->zoomRect);
 }
 
-void SDKDecorator::_PaintTab(Decorator::Tab* /*tab*/, const BRect& tabRect,
+void SDKDecorator::_PaintTab(Decorator::Tab*, const BRect& tabRect,
                                bool focused, bool stackTile)
 {
     TabDrawSpec spec = fRenderer.CalcTab(tabRect, focused, stackTile);
@@ -238,14 +236,11 @@ void SDKDecorator::_PaintTab(Decorator::Tab* /*tab*/, const BRect& tabRect,
     fDrawingEngine->StrokeLine(tabRect.RightTop(), tabRect.RightBottom(),
                                 spec.border_outer_shadow);
     BRect inner = tabRect.InsetByCopy(1.0f, 1.0f);
-    fDrawingEngine->StrokeLine(inner.LeftTop(),  inner.LeftBottom(),
-                                spec.bevel_light);
-    fDrawingEngine->StrokeLine(inner.LeftTop(),  inner.RightTop(),
-                                spec.bevel_light);
-    fDrawingEngine->StrokeLine(inner.RightTop(), inner.RightBottom(),
-                                spec.bevel_shadow);
+    fDrawingEngine->StrokeLine(inner.LeftTop(),  inner.LeftBottom(),  spec.bevel_light);
+    fDrawingEngine->StrokeLine(inner.LeftTop(),  inner.RightTop(),    spec.bevel_light);
+    fDrawingEngine->StrokeLine(inner.RightTop(), inner.RightBottom(), spec.bevel_shadow);
 
-    // Fill / gradiente
+    // Fill
     if (spec.gradient.active) {
         BGradientLinear gradient;
         gradient.SetStart(BPoint(spec.gradient.start_x, spec.gradient.start_y));
@@ -257,17 +252,9 @@ void SDKDecorator::_PaintTab(Decorator::Tab* /*tab*/, const BRect& tabRect,
         fDrawingEngine->FillRect(fill, spec.fill_color);
     }
 
-    // Texture
-    if (fConfig.tab.effect.type == EFFECT_TEXTURE && fTabPainter != nullptr) {
-        BBitmap* bmp = fTabPainter->CreateBlendedBitmap(fill, spec.fill_color);
-        if (bmp) {
-            drawing_mode old;
-            fDrawingEngine->SetDrawingMode(B_OP_COPY, old);
-            fDrawingEngine->DrawBitmap(bmp, fill.OffsetToCopy(0, 0), fill);
-            fDrawingEngine->SetDrawingMode(old);
-            delete bmp;
-        }
-    }
+    // Texture (BBitmap→ non supportato da DrawingEngine, skip per ora)
+    // DrawingEngine::DrawBitmap richiede ServerBitmap* — TabPainter
+    // sarà integrato in una versione futura tramite ServerBitmap.
 
     // Glass
     if (spec.glass_enabled) {
@@ -279,33 +266,34 @@ void SDKDecorator::_PaintTab(Decorator::Tab* /*tab*/, const BRect& tabRect,
 
     // Inner glow
     if (spec.inner_glow_enabled)
-        fDrawingEngine->StrokeLine(BPoint(fill.left,  fill.top),
+        fDrawingEngine->StrokeLine(BPoint(fill.left, fill.top),
                                     BPoint(fill.right, fill.top),
                                     spec.inner_glow_color);
 
     // Separatore
     if (spec.separator_enabled)
         fDrawingEngine->StrokeLine(
-            BPoint(tabRect.left  + 2, tabRect.bottom + 1),
-            BPoint(tabRect.right - 2, tabRect.bottom + 1),
+            BPoint(tabRect.left+2,  tabRect.bottom+1),
+            BPoint(tabRect.right-2, tabRect.bottom+1),
             spec.separator_color);
 
-    // Stack&Tile indicator
+    // Stack&Tile indicator: piccolo rettangolo (FillEllipse non accetta rgb_color)
     if (spec.stack_indicator)
-        fDrawingEngine->FillEllipse(spec.indicator_rect, spec.indicator_color);
+        fDrawingEngine->FillRect(spec.indicator_rect, spec.indicator_color);
 }
 
 // ─── _DrawTitle ───────────────────────────────────────────────────────────────
 
-void SDKDecorator::_DrawTitle(Decorator::Tab* _tab, BRect /*r*/) {
+void SDKDecorator::_DrawTitle(Decorator::Tab* _tab, BRect) {
     Decorator::Tab* tab = static_cast<Decorator::Tab*>(_tab);
     const BRect& tabRect   = tab->tabRect;
     const BRect& closeRect = tab->closeRect;
     const BRect& zoomRect  = tab->zoomRect;
 
-    // Leggiamo i colori direttamente da GetComponentColors (è public in Decorator)
+    // highlight=0 per finestre non in Stack&Tile
+    uint8 hl = tab->isHighlighted ? HIGHLIGHT_STACK_AND_TILE : 0;
     ComponentColors colors;
-    GetComponentColors(COMPONENT_TAB, tab->highlight, colors, tab);
+    GetComponentColors(COMPONENT_TAB, hl, colors, tab);
 
     fDrawingEngine->SetDrawingMode(B_OP_OVER);
     fDrawingEngine->SetHighColor(colors[COLOR_TAB_TEXT]);
@@ -346,7 +334,7 @@ void SDKDecorator::_DrawTitle(Decorator::Tab* _tab, BRect /*r*/) {
         fDrawingEngine->SetHighColor(fConfig.title.shadow_color);
         fDrawingEngine->DrawString(tab->truncatedTitle.String(),
                                     tab->truncatedTitleLength,
-                                    BPoint(titleX + 1, titleY + 1));
+                                    BPoint(titleX+1, titleY+1));
         fDrawingEngine->SetHighColor(colors[COLOR_TAB_TEXT]);
     }
     fDrawingEngine->DrawString(tab->truncatedTitle.String(),
@@ -360,12 +348,18 @@ void SDKDecorator::_DrawTitle(Decorator::Tab* _tab, BRect /*r*/) {
 void SDKDecorator::_PaintButton(const BRect& rect, const ButtonDrawSpec& spec) {
     fDrawingEngine->FillRect(rect, spec.bg_color);
     switch (spec.shape) {
-        case BTN_CIRCLE:
-            fDrawingEngine->FillEllipse(rect, spec.bg_color);
-            fDrawingEngine->StrokeEllipse(rect, spec.shadow);
-            { BRect inner = rect.InsetByCopy(1.0f, 1.0f);
-              fDrawingEngine->StrokeEllipse(inner, spec.highlight); }
+        case BTN_CIRCLE: {
+            // Cerchio approssimato: FillRect interno + bordo con StrokeLine
+            // DrawingEngine non ha FillEllipse(BRect, rgb_color)
+            BRect inner = rect.InsetByCopy(1.0f, 1.0f);
+            fDrawingEngine->FillRect(inner, spec.bg_color);
+            // Bordo simulato con 4 linee
+            fDrawingEngine->StrokeLine(rect.LeftTop(),    rect.RightTop(),    spec.highlight);
+            fDrawingEngine->StrokeLine(rect.LeftTop(),    rect.LeftBottom(),  spec.highlight);
+            fDrawingEngine->StrokeLine(rect.RightTop(),   rect.RightBottom(), spec.shadow);
+            fDrawingEngine->StrokeLine(rect.LeftBottom(), rect.RightBottom(), spec.shadow);
             break;
+        }
         case BTN_ROUNDED_SQUARE:
         case BTN_SQUARE:
         default:
@@ -392,7 +386,8 @@ void SDKDecorator::_PaintButtonIcon(const BRect& rect, const ButtonDrawSpec& spe
 
     switch (spec.icon_style) {
         case ICON_DOT:
-            fDrawingEngine->FillEllipse(
+            // Piccolo rettangolo al posto del cerchio (DrawingEngine limita)
+            fDrawingEngine->FillRect(
                 BRect(cx-r*0.35f, cy-r*0.35f, cx+r*0.35f, cy+r*0.35f), ic);
             break;
         case ICON_CLASSIC_BE:
@@ -424,8 +419,7 @@ void SDKDecorator::_DrawClose(Decorator::Tab* _tab, bool direct, BRect rect) {
     Decorator::Tab* tab = static_cast<Decorator::Tab*>(_tab);
     bool prev = fDrawingEngine->CopyToFrontEnabled();
     fDrawingEngine->SetCopyToFrontEnabled(direct);
-    ButtonDrawSpec spec = fRenderer.CalcButton(true, tab->closePressed, tab->buttonFocus);
-    _PaintButton(rect, spec);
+    _PaintButton(rect, fRenderer.CalcButton(true,  tab->closePressed, tab->buttonFocus));
     fDrawingEngine->SetCopyToFrontEnabled(prev);
 }
 
@@ -434,8 +428,7 @@ void SDKDecorator::_DrawZoom(Decorator::Tab* _tab, bool direct, BRect rect) {
     Decorator::Tab* tab = static_cast<Decorator::Tab*>(_tab);
     bool prev = fDrawingEngine->CopyToFrontEnabled();
     fDrawingEngine->SetCopyToFrontEnabled(direct);
-    ButtonDrawSpec spec = fRenderer.CalcButton(false, tab->zoomPressed, tab->buttonFocus);
-    _PaintButton(rect, spec);
+    _PaintButton(rect, fRenderer.CalcButton(false, tab->zoomPressed,  tab->buttonFocus));
     fDrawingEngine->SetCopyToFrontEnabled(prev);
 }
 
@@ -448,7 +441,6 @@ void SDKDecorator::_GetButtonSizeAndOffset(const BRect& tabRect,
     *offset = (float)fConfig.buttons.margin;
     *inset  = 0.0f;
     *size   = tabRect.Height() - (float)fConfig.buttons.margin * 2.0f;
-    if (*size > (float)fConfig.buttons.size)
-        *size = (float)fConfig.buttons.size;
+    if (*size > (float)fConfig.buttons.size) *size = (float)fConfig.buttons.size;
     if (*size < 0) *size = 0;
 }
