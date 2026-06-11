@@ -50,7 +50,7 @@ INSTALL_DIR = /boot/home/config/non-packaged/add-ons/decorators
 
 .PHONY: deploy undeploy
 
-deploy: all
+deploy:
 	@mkdir -p $(INSTALL_DIR)
 	@OBJECTS_DIR=$$(ls -d objects.* 2>/dev/null | head -1); \
 	if [ -z "$$OBJECTS_DIR" ]; then \
